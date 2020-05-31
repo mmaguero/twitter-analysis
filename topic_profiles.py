@@ -20,7 +20,6 @@ from utils import preprocess
 import dask.dataframe as dd
 import glob
 import pandas as pd
-import datetime
 
 
 if __name__ == '__main__':
@@ -47,11 +46,6 @@ if __name__ == '__main__':
                       help='threshold probability for topic assignment')
   parser.add_argument('--num_example', required=True, type=int, default=5000,
                       help='number of tweets to show on the plot')
-  #                   
-  parser.add_argument('--start_date', required=True, type=str,
-                      help='start date of data split, format: yyyy-mm-dd')                    
-  parser.add_argument('--end_date', required=True, type=str,
-                      help='end date of data split') 
   args = parser.parse_args()
 
   # unpack
@@ -62,9 +56,6 @@ if __name__ == '__main__':
   n_top_words = args.top_n
   threshold = args.threshold
   num_example = args.num_example
-  #
-  start_date = datetime.datetime.strptime(args.start_date, "%Y-%m-%d").date()
-  end_date = datetime.datetime.strptime(args.end_date, "%Y-%m-%d").date()
 
 
   ##############################################################################
@@ -73,27 +64,24 @@ if __name__ == '__main__':
   num_scanned_tweet = 0
   num_qualified_tweet = 0
 
-  #raw_tweet_files = os.listdir(raw_tweet_dir)
-  all_files = glob.glob(raw_tweet_dir + "/ours_*.csv")
-  raw_tweet_files = dd.read_csv(all_files,usecols=['tweet_id','tweet','date'])
-  raw_tweet_files = raw_tweet_files.compute()
-  
-  all_files = glob.glob(raw_tweet_dir + "/tweets_*.csv")
-  raw_lang_files = dd.read_csv(all_files,usecols=['tweet_id','lang'])
-  raw_lang_files = raw_lang_files.compute()
-  
-  # split by date
-  raw_tweet_files['date'] = pd.to_datetime(raw_tweet_files['date']).dt.date
-  raw_tweet_files = raw_tweet_files.loc[(raw_tweet_files['date'] <= end_date) & (raw_tweet_files['date'] >= start_date)]
-  
-  raw_tweet_merge = raw_tweet_files.merge(raw_lang_files, on='tweet_id')
-  raw_tweet_merge.info()
-  raw_tweet_text = set(raw_tweet_merge.loc[raw_tweet_merge['lang'].str.contains("es")]['tweet'])
+  all_files = glob.glob(raw_tweet_dir + "week_*_all.tsv")
+  li = []
+  for filename in all_files:
+      print(filename)
+      df = pd.read_csv(filename, index_col=None, #header=0,
+                sep='\t',encoding = 'utf8',lineterminator='\n', usecols = [16,20],
+                names=['user_id_str','user_description'] ,low_memory=False)
+      li.append(df)
 
-  #raw_tweet_text = raw_tweet_text.reset_index(drop=True)
-  #raw_tweet_utext = raw_tweet_text.drop_duplicates()
-  #raw_tweet_utext = raw_tweet_utext.reset_index(drop=True)
-  #raw_tweet_utext = set(raw_tweet_text['tweet'].tolist())
+  raw_tweet_files = pd.concat(li, axis=0, ignore_index=True)
+  
+  raw_tweet_files.info()
+  raw_tweet_files['user_id_str'] = pd.to_numeric(raw_tweet_files['user_id_str'], errors='coerce')
+  raw_tweet_files["user_description"]=raw_tweet_files["user_description"].astype(str)
+  raw_tweet_files = raw_tweet_files[~raw_tweet_files['user_id_str'].isnull()]
+  raw_tweet_files = raw_tweet_files[~raw_tweet_files['user_description'].isnull()]
+  raw_tweet_text = set(raw_tweet_files['user_description'])
+
   print('len', len(raw_tweet_text))
 
   raw_tweet = []
@@ -134,32 +122,22 @@ if __name__ == '__main__':
   ##############################################################################
   # train LDA
 
-  # ignore terms that have a document frequency strictly lower than 1, 3, 5
-  try:
-      cvectorizer = CountVectorizer(min_df=5)
-      cvz = cvectorizer.fit_transform(processed_tweet)
-  except:
-      try:
-          cvectorizer = CountVectorizer(min_df=3)
-          cvz = cvectorizer.fit_transform(processed_tweet)
-      except:
-          cvectorizer = CountVectorizer(min_df=1)
-          cvz = cvectorizer.fit_transform(processed_tweet)
+  # ignore terms that have a document frequency strictly lower than 5, 10
+  cvectorizer = CountVectorizer(min_df=5)
+  cvz = cvectorizer.fit_transform(processed_tweet)
 
   lda_model = lda.LDA(n_topics=n_topics, n_iter=n_iter)
-  X_topics = lda_model.fit_transform(cvz) 
+  X_topics = lda_model.fit_transform(cvz)
 
   t2 = time.time()
   print('\n>>> LDA training done; took {} mins\n'.format((t2-t1)/60.))
-  
-  try:
-      np.save('lda_simple/lda_doc_topic_{}tweets_{}topics_{}.npy'.format(
-    X_topics.shape[0], X_topics.shape[1], end_date), X_topics)
-      np.save('lda_simple/lda_topic_word_{}tweets_{}topics_{}.npy'.format(
-    X_topics.shape[0], X_topics.shape[1], end_date), lda_model.topic_word_)
-      print('\n>>> doc_topic & topic word written to disk\n')
-  except Exception as e:
-      print('\n>>> doc_topic & topic word written to disk\n', e, '\n')
+
+  np.save('lda_simple/lda_doc_topic_{}tweets_{}topics.npy'.format(
+    X_topics.shape[0], X_topics.shape[1]), X_topics)
+  np.save('lda_simple/lda_topic_word_{}tweets_{}topics.npy'.format(
+    X_topics.shape[0], X_topics.shape[1]), lda_model.topic_word_)
+  print('\n>>> doc_topic & topic word written to disk\n')
+
   ##############################################################################
   # threshold and plot
 
@@ -242,14 +220,13 @@ if __name__ == '__main__':
 
   # plot crucial words
   for i in range(X_topics.shape[1]):
-    topic_coord[i, 0] = 0 if np.isnan(topic_coord[i, 0]) else topic_coord[i, 0]
-    topic_coord[i, 1] = 0 if np.isnan(topic_coord[i, 1]) else topic_coord[i, 1]
     plot_lda.text(topic_coord[i, 0], topic_coord[i, 1], [topic_summaries[i]])
   hover = plot_lda.select(dict(type=HoverTool))
   hover.tooltips = {"tweet": "@tweet - topic: @topic_key"}
 
-  save(plot_lda, 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}.html'.format(
-    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date))
+  save(plot_lda, 'tsne_lda_viz_{}_{}_{}_{}_{}_{}.html'.format(
+    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words))
+
 
   t4 = time.time()
   print('\n>>> whole process done; took {} mins\n'.format((t4-t0)/60.))
