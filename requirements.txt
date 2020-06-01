@@ -5,3 +5,9 @@ sklearn
 nltk
 bokeh
 lda
+pattern
+spacy
+pandas
+dask
+stop_words
+stopwordsiso
