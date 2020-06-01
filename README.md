@@ -3,14 +3,13 @@
 
 ## virtualenv
 
-First make sure `pip` and `virtualenv` are installed. Then create a virtual
-environment in the root dir by running:
+First create a virtual environment in the root dir by running:
 
-`virtualenv env`
+`python3 -m venv venv`
 
 then activate the virtual env with
 
-`source env/bin/activate`
+`source venv/bin/activate`
 
 (to get out of the virtualenv, run `deactivate`)
 
@@ -51,7 +50,7 @@ Run
 
 where `<tw>` and `<top_n_words>` are arguments
 representing within what time window we treat tweets as a batch, and how many
-words with highest idf scores to show, while `<*save_history>`` is an optional
+words with highest idf scores to show, while `<*save_history>` is an optional
 boolean value indicating whether we want to dump the history. Make sure API
 credentials are properly stored in the credentials.json file.
 
