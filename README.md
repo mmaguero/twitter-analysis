@@ -41,9 +41,9 @@ Rename `sample_credentials.json` to `credentials.json`, and fill in the four
 credentials from your twitter app.
 
 
-## Real-time twitter trend discovery
+## Real-time twitter trend discovery 
 
-Run 
+(Not tested in this fork) Run 
 
 `bokeh serve --show real-time-twitter-trend-discovery.py --args <tw>
 <top_n_words> <*save_history>`, 
@@ -57,7 +57,7 @@ credentials are properly stored in the credentials.json file.
 
 ## Topic modeling and t-SNE visualization: 20 Newsgroups
 
-To train a topic model and visualize the news in 2-D space, run
+(Not tested in this fork) To train a topic model and visualize the news in 2-D space, run
 
 `python topic_20news.py --n_topics <n_topics> --n_iter <n_iter>
 --top_n <top_n> --threshold <threshold>`,
@@ -71,7 +71,7 @@ probability for topic assignment (default 0.0).
 
 ## Scrape tweets and save them to disk
 
-To scrape tweets and save them to disk for later use, run
+(Not tested in this fork) To scrape tweets and save them to disk for later use, run
 
 `python scrape_tweets.py`. 
 
@@ -84,7 +84,7 @@ Make sure API credentials are properly stored in the credentials.json file.
 
 ## Topic modeling and t-SNE visualization: tweets
 
-First make sure you accumulated some tweets, then run 
+First make sure you accumulated some tweets (in this fork, we prefer https://github.com/Jefferson-Henrique/GetOldTweets-python), then run 
 
 `python topic_tweets.py
 --raw_tweet_dir <raw_tweet_dir> --num_train_tweet <num_train_tweet>
