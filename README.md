@@ -84,7 +84,7 @@ Make sure API credentials are properly stored in the credentials.json file.
 
 ## Topic modeling and t-SNE visualization: tweets
 
-First make sure you accumulated some tweets (in this fork, we prefer https://github.com/Jefferson-Henrique/GetOldTweets-python), then run 
+First make sure you accumulated some tweets (in this fork, we prefer https://github.com/Jefferson-Henrique/GetOldTweets-python and save it in CSV format), then run 
 
 `python topic_tweets.py
 --raw_tweet_dir <raw_tweet_dir> --num_train_tweet <num_train_tweet>
