@@ -33,6 +33,7 @@ and spacy model:
 ```bash
 python -m spacy download es_core_news_sm
 ```
+Problems with pattern via pip? See https://github.com/clips/pattern#installation
 
 
 ## Credentials
@@ -95,8 +96,8 @@ where `<raw_tweet_dir>` being a folder containing
 raw tweet files, `<num_train_tweet>` being the number of tweets we use for
 training an LDA model, `<n_topics>` being the number of topics we select
 (default 20), `<n_iter>` being the number of iterations for training an LDA
-model (default 500), `<top_n>` being the number of top keywords we display
-(default 5), `<threshold>` being the threshold probability for topic assignment
+model (default 1500), `<top_n>` being the number of top keywords we display
+(default 8), `<threshold>` being the threshold probability for topic assignment
 (default 0.0), and `<num_example>` being number of tweets to show on the plot
 (default 5000). The same for `topic_profiles.py`.
 
