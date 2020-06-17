@@ -33,9 +33,9 @@ if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
   parser.add_argument('--raw_tweet_dir', required=True, type=str,
-                      help='a directory of raw tweet files')
+                      help='a directory of raw profile files')
   parser.add_argument('--num_train_tweet', required=True, type=int,
-                      help='number of tweets used for training a LDA model')
+                      help='number of profiles used for training a LDA model')
   parser.add_argument('--n_topics', required=True, type=int, default=20,
                       help='number of topics')
   parser.add_argument('--n_iter', required=True, type=int, default=1500,
@@ -45,7 +45,9 @@ if __name__ == '__main__':
   parser.add_argument('--threshold', required=True, type=float, default=0.0,
                       help='threshold probability for topic assignment')
   parser.add_argument('--num_example', required=True, type=int, default=5000,
-                      help='number of tweets to show on the plot')
+                      help='number of profiles to show on the plot')
+  parser.add_argument('--sentiment', required=True, type=str, default='all',
+                      help='sentiment from tweets of profiles to plot')
   args = parser.parse_args()
 
   # unpack
@@ -56,10 +58,11 @@ if __name__ == '__main__':
   n_top_words = args.top_n
   threshold = args.threshold
   num_example = args.num_example
+  sentiment = args.sentiment
 
 
   ##############################################################################
-  # get training tweets
+  # get training 
 
   num_scanned_tweet = 0
   num_qualified_tweet = 0
@@ -69,13 +72,21 @@ if __name__ == '__main__':
   for filename in all_files:
       print(filename)
       df = pd.read_csv(filename, index_col=None, #header=0,
-                sep='\t',encoding = 'utf8',lineterminator='\n', usecols = [16,20],
-                names=['user_id_str','user_description'] ,low_memory=False)
+                sep='\t',encoding = 'utf8',lineterminator='\n', usecols = [16,20,36],
+                names=['user_id_str','user_description','sentiment'] ,low_memory=False)
       li.append(df)
 
   raw_tweet_files = pd.concat(li, axis=0, ignore_index=True)
   
   raw_tweet_files.info()
+  # split by sentiment
+  raw_tweet_files["sentiment"] = raw_tweet_files["sentiment"].apply(pd.to_numeric, errors='coerce')
+  
+  if sentiment == 'pos':
+      raw_tweet_files = raw_tweet_files[raw_tweet_files['sentiment'].apply(lambda x: x>0.1)]
+  elif sentiment == 'neg':
+      raw_tweet_files = raw_tweet_files[raw_tweet_files['sentiment'].apply(lambda x: x<-0.1)]
+  
   raw_tweet_files['user_id_str'] = pd.to_numeric(raw_tweet_files['user_id_str'], errors='coerce')
   raw_tweet_files["user_description"]=raw_tweet_files["user_description"].astype(str)
   raw_tweet_files = raw_tweet_files[~raw_tweet_files['user_id_str'].isnull()]
@@ -90,11 +101,6 @@ if __name__ == '__main__':
 
   t0 = time.time()
 
-  '''for f in raw_tweet_files:
-    in_file = os.path.join(raw_tweet_dir, f)
-    if not in_file.endswith('.txt'):  # ignore non .txt file
-      continue'''
-  #for t in open(in_file):
   for row in raw_tweet_text:
       num_scanned_tweet += 1
       p_t = preprocess(row)
@@ -132,10 +138,10 @@ if __name__ == '__main__':
   t2 = time.time()
   print('\n>>> LDA training done; took {} mins\n'.format((t2-t1)/60.))
 
-  np.save('lda_simple/lda_doc_topic_{}tweets_{}topics.npy'.format(
-    X_topics.shape[0], X_topics.shape[1]), X_topics)
-  np.save('lda_simple/lda_topic_word_{}tweets_{}topics.npy'.format(
-    X_topics.shape[0], X_topics.shape[1]), lda_model.topic_word_)
+  np.save('lda_simple/lda_doc_topic_{}profiles_{}topics_{}.npy'.format(
+    X_topics.shape[0], X_topics.shape[1], sentiment), X_topics)
+  np.save('lda_simple/lda_topic_word_{}profiles_{}topics_{}.npy'.format(
+    X_topics.shape[0], X_topics.shape[1], sentiment), lda_model.topic_word_)
   print('\n>>> doc_topic & topic word written to disk\n')
 
   ##############################################################################
@@ -183,7 +189,7 @@ if __name__ == '__main__':
 
   # plot
 
-  title = "t-SNE visualization of LDA model trained on {} tweets, {} topics, " \
+  title = "t-SNE visualization of LDA model trained on {} profiles,  {} topics, " \
           "thresholding at {} topic probability, {} iter ({} data points and " \
           "top {} words)".format(num_qualified_tweet, n_topics, threshold,
                                  n_iter, num_example, n_top_words)
@@ -224,8 +230,8 @@ if __name__ == '__main__':
   hover = plot_lda.select(dict(type=HoverTool))
   hover.tooltips = {"tweet": "@tweet - topic: @topic_key"}
 
-  save(plot_lda, 'tsne_lda_viz_{}_{}_{}_{}_{}_{}.html'.format(
-    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words))
+  save(plot_lda, 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}.html'.format(
+    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, sentiment))
 
 
   t4 = time.time()

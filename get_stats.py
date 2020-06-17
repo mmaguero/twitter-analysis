@@ -22,7 +22,18 @@ data = pd.merge(raw_tweet_files,raw_lang_files, on='tweet_id')
 
 # get stats
 data['date'] = pd.to_datetime(data['date'])
+# only by date
 dataC = data.groupby([data.date.dt.year,data.date.dt.month]).count()
 # write stats
-with open("statistics-topic.tsv",'w') as write_tsv:
+with open("statistics-date.tsv",'w') as write_tsv:
+    write_tsv.write(dataC[['date']].to_csv(sep='\t', encoding='utf-8'))
+# ... and by lang
+dataC = data.groupby([data.date.dt.year,data.date.dt.month,data.lang]).count()
+# write stats
+with open("statistics-date-lang.tsv",'w') as write_tsv:
+    write_tsv.write(dataC[['date']].to_csv(sep='\t', encoding='utf-8'))
+# ... and by lang gn
+dataC = data[(data['lang'].str.contains('gn',regex=True))].groupby([data.date.dt.year,data.date.dt.month,data.lang]).count()
+# write stats
+with open("statistics-date-gn.tsv",'w') as write_tsv:
     write_tsv.write(dataC[['date']].to_csv(sep='\t', encoding='utf-8'))

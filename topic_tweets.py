@@ -21,7 +21,7 @@ import dask.dataframe as dd
 import glob
 import pandas as pd
 import datetime
-
+from pytopicrank import TopicRank
 
 if __name__ == '__main__':
 
@@ -136,14 +136,14 @@ if __name__ == '__main__':
 
   # ignore terms that have a document frequency strictly lower than 1, 3, 5
   try:
-      cvectorizer = CountVectorizer(min_df=5)
+      cvectorizer = CountVectorizer(min_df=5, max_df=0.95)
       cvz = cvectorizer.fit_transform(processed_tweet)
   except:
       try:
-          cvectorizer = CountVectorizer(min_df=3)
+          cvectorizer = CountVectorizer(min_df=3, max_df=0.95)
           cvz = cvectorizer.fit_transform(processed_tweet)
       except:
-          cvectorizer = CountVectorizer(min_df=1)
+          cvectorizer = CountVectorizer(min_df=1, max_df=0.95)
           cvz = cvectorizer.fit_transform(processed_tweet)
 
   lda_model = lda.LDA(n_topics=n_topics, n_iter=n_iter)
@@ -193,8 +193,9 @@ if __name__ == '__main__':
   topic_word = lda_model.topic_word_  # get the topic words
   vocab = cvectorizer.get_feature_names()
   for i, topic_dist in enumerate(topic_word):
-    topic_words = np.array(vocab)[np.argsort(topic_dist)][:-(n_top_words+1):-1]
-    topic_summaries.append(' '.join(topic_words))
+    topic_words = np.array(vocab)[np.argsort(topic_dist)]#[:-(n_top_words+1):-1]
+    tr = TopicRank(' '.join(topic_words)).get_top_n(n=n_top_words)
+    topic_summaries.append(' '.join(tr))
 
   # use the coordinate of a random tweet as string topic string coordinate
   topic_coord = np.empty((X_topics.shape[1], 2)) * np.nan
@@ -215,7 +216,7 @@ if __name__ == '__main__':
                        tools="pan,wheel_zoom,box_zoom,reset,hover,previewsave",
                        x_axis_type=None, y_axis_type=None, min_border=1)
 
-                   # create the dictionary with all the information    
+  # create the dictionary with all the information    
   plot_dict = {
         'x': tsne_lda[:, 0],#tsne_lda[:num_example, 0],
         'y': tsne_lda[:, 1],#tsne_lda[:num_example, 1],
