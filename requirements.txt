@@ -7,4 +7,3 @@ bokeh
 lda
 pandas
 dask
-pytopicrank
