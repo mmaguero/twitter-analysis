@@ -21,7 +21,7 @@ import dask.dataframe as dd
 import glob
 import pandas as pd
 import datetime
-from pytopicrank import TopicRank
+#
 
 if __name__ == '__main__':
 
@@ -136,18 +136,18 @@ if __name__ == '__main__':
 
   # ignore terms that have a document frequency strictly lower than 1, 3, 5
   try:
-      cvectorizer = CountVectorizer(min_df=5, max_df=0.95)
+      cvectorizer = CountVectorizer(min_df=5)
       cvz = cvectorizer.fit_transform(processed_tweet)
   except:
       try:
-          cvectorizer = CountVectorizer(min_df=3, max_df=0.95)
+          cvectorizer = CountVectorizer(min_df=3)
           cvz = cvectorizer.fit_transform(processed_tweet)
       except:
-          cvectorizer = CountVectorizer(min_df=1, max_df=0.95)
+          cvectorizer = CountVectorizer(min_df=1)
           cvz = cvectorizer.fit_transform(processed_tweet)
 
   lda_model = lda.LDA(n_topics=n_topics, n_iter=n_iter)
-  X_topics = lda_model.fit_transform(cvz) 
+  X_topics = lda_model.fit_transform(cvz)
 
   t2 = time.time()
   print('\n>>> LDA training done; took {} mins\n'.format((t2-t1)/60.))
@@ -190,15 +190,29 @@ if __name__ == '__main__':
 
   # show topics and their top words
   topic_summaries = []
+  topic_keywords = []
   topic_word = lda_model.topic_word_  # get the topic words
   vocab = cvectorizer.get_feature_names()
   for i, topic_dist in enumerate(topic_word):
-    topic_words = np.array(vocab)[np.argsort(topic_dist)]#[:-(n_top_words+1):-1]
-    tr = TopicRank(' '.join(topic_words)).get_top_n(n=n_top_words)
-    topic_summaries.append(' '.join(tr))
+    topic_words = np.array(vocab)[np.argsort(topic_dist)][:-(n_top_words+1):-1]
+    topic_summaries.append(str(i) + ':' + ','.join(topic_words))
+    topic_keywords.append(','.join(topic_words))
+  
+  #
+  sent_topics_df = pd.DataFrame()
+  # Get main topic in each document
+  for i, topics in enumerate(X_topics):
+      # Get the Dominant topic, Perc Contribution and Keywords for each document
+      sent_topics_df = sent_topics_df.append(pd.Series([int(topics.argmax()), round(topics[topics.argmax()],4), topic_keywords[topics.argmax()]]), ignore_index=True)
+  sent_topics_df.columns = ['Dominant_Topic', 'Perc_Contribution', 'Topic_Keywords']
+  # Add original text to the end of the output
+  contents = pd.Series(_raw_tweet)
+  sent_topics_df = pd.concat([sent_topics_df, contents], axis=1)
+  #
 
   # use the coordinate of a random tweet as string topic string coordinate
   topic_coord = np.empty((X_topics.shape[1], 2)) * np.nan
+  _lda_keys = [int(k) for k in _lda_keys]
   for topic_num in _lda_keys:
     if not np.isnan(topic_coord).any():
       break
@@ -208,13 +222,17 @@ if __name__ == '__main__':
 
   title = "t-SNE visualization of LDA model trained on {} tweets, {} topics, " \
           "thresholding at {} topic probability, {} iter ({} data points and " \
-          "top {} words)".format(num_qualified_tweet, n_topics, threshold,
-                                 n_iter, num_example, n_top_words)
+          "top {} words: {})".format(num_qualified_tweet, n_topics, threshold,
+                                 n_iter, num_example, n_top_words, end_date)
 
   plot_lda = bp.figure(plot_width=1400, plot_height=1100,
                        title=title,
                        tools="pan,wheel_zoom,box_zoom,reset,hover,previewsave",
                        x_axis_type=None, y_axis_type=None, min_border=1)
+  plot_lda.title.text_font_size = '8pt'
+  plot_lda.axis.major_label_text_font_size="8pt"
+  plot_lda.yaxis.axis_label_text_font_size = "8pt"
+  plot_lda.xaxis.axis_label_text_font_size = "8pt"
 
   # create the dictionary with all the information    
   plot_dict = {
@@ -232,25 +250,43 @@ if __name__ == '__main__':
   source = bp.ColumnDataSource(data=plot_df)
 
   # build scatter function from the columns of the dataframe
-  plot_lda.scatter('x', 'y', color='colors', source=source)
-
-  '''plot_lda.scatter(x=tsne_lda[:, 0], y=tsne_lda[:, 1],
-                   color=colormap[_lda_keys][:num_example],
-                   source=bp.ColumnDataSource({
-                     "tweet": _raw_tweet[:num_example],
-                     "topic_key": _lda_keys[:num_example]
-                   }))'''                
+  plot_lda.scatter('x', 'y', color='colors', source=source)               
 
   # plot crucial words
   for i in range(X_topics.shape[1]):
-    topic_coord[i, 0] = 0 if np.isnan(topic_coord[i, 0]) else topic_coord[i, 0]
-    topic_coord[i, 1] = 0 if np.isnan(topic_coord[i, 1]) else topic_coord[i, 1]
-    plot_lda.text(topic_coord[i, 0], topic_coord[i, 1], [topic_summaries[i]])
+    #
+    try:
+      topic_coord[i, 0] = 0 if np.isnan(topic_coord[i, 0]) else topic_coord[i, 0]
+      topic_coord[i, 1] = 0 if np.isnan(topic_coord[i, 1]) else topic_coord[i, 1]
+      plot_lda.text(topic_coord[i, 0], topic_coord[i, 1], [topic_summaries[i]])
+    except:
+      print("Error in plot_lda...",str(i)) 
+  #   
   hover = plot_lda.select(dict(type=HoverTool))
   hover.tooltips = {"tweet": "@tweet - topic: @topic_key"}
 
-  save(plot_lda, 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}.html'.format(
-    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date))
+  name = 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}.html'.format(
+    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date)
+  save(plot_lda, name, title=name.replace(".html",""))
+  
+  #
+  # Group top 5 sentences under each topic
+  sent_topics_sorteddf = pd.DataFrame()
+  sent_topics_outdf_grpd = sent_topics_df.groupby('Dominant_Topic')
+  for i, grp in sent_topics_outdf_grpd:
+    print(grp)
+    sent_topics_sorteddf = pd.concat([sent_topics_sorteddf, 
+                                             grp.sort_values(['Perc_Contribution'], ascending=[0]).head(5)], 
+                                            axis=0)
+  # Reset Index    
+  sent_topics_sorteddf.reset_index(drop=True, inplace=True)
+  # Format
+  sent_topics_sorteddf.columns = ['Topic_Num', "Topic_Perc_Contrib", "Keywords", "Text"]
+  # Show
+  sent_topics_sorteddf.sample(5)
+  # save to disk
+  sent_topics_sorteddf.to_csv(name.replace(".html",".tsv"), sep='\t', encoding='utf-8', index=False)
+  #
 
   t4 = time.time()
   print('\n>>> whole process done; took {} mins\n'.format((t4-t0)/60.))
