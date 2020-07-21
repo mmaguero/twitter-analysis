@@ -7,3 +7,4 @@ bokeh
 lda
 pandas
 dask
+tmtoolkit[recommended,lda,sklearn,gensim]
