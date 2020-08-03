@@ -12,3 +12,4 @@ stop_words
 stopwordsiso
 spacy
 spacy_spanish_lemmatizer
+pattern
