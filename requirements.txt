@@ -8,3 +8,7 @@ lda
 pandas
 dask
 tmtoolkit[recommended,lda,sklearn,gensim]
+stop_words
+stopwordsiso
+spacy
+spacy_spanish_lemmatizer
