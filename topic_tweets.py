@@ -109,7 +109,7 @@ if __name__ == '__main__':
   #for t in open(in_file):
   for row in raw_tweet_text:
       num_scanned_tweet += 1
-      p_t = preprocess(row)
+      p_t = preprocess(row, ascii=False)
       if p_t and p_t not in processed_tweet_set: # ignore duplicate tweets
         raw_tweet += row,
         processed_tweet += p_t,
@@ -270,13 +270,13 @@ if __name__ == '__main__':
   save(plot_lda, name, title=name.replace(".html",""))
   
   #
-  # Group top 5 sentences under each topic
+  # Group top 10 sentences under each topic
   sent_topics_sorteddf = pd.DataFrame()
   sent_topics_outdf_grpd = sent_topics_df.groupby('Dominant_Topic')
   for i, grp in sent_topics_outdf_grpd:
     print(grp)
     sent_topics_sorteddf = pd.concat([sent_topics_sorteddf, 
-                                             grp.sort_values(['Perc_Contribution'], ascending=[0]).head(5)], 
+                                             grp.sort_values(['Perc_Contribution'], ascending=[0]).head(10)], 
                                             axis=0)
   # Reset Index    
   sent_topics_sorteddf.reset_index(drop=True, inplace=True)
