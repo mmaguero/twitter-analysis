@@ -6,10 +6,11 @@ from nltk.corpus import stopwords
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 #
-from pattern.es import singularize
+#from pattern.es import singularize
 from stop_words import get_stop_words
 import stopwordsiso as stopwordsiso
 import spacy
+from spacy_spanish_lemmatizer import SpacyCustomLemmatizer
 nlp = spacy.load('es_core_news_md', disable=['ner', 'parser']) # disabling Named Entity Recognition for speed
 import matplotlib.pyplot as plt   # for plotting the results
 plt.style.use('ggplot')
@@ -19,7 +20,12 @@ from tmtoolkit.topicmod.evaluate import results_by_parameter
 from tmtoolkit.topicmod.visualize import plot_eval_results
 from tmtoolkit.preprocess import TMPreproc
 from tmtoolkit.corpus import Corpus
+from collections import defaultdict
 
+# load custom lemma
+lemmatizer = SpacyCustomLemmatizer()
+nlp.add_pipe(lemmatizer, name="lemmatizer", after="tagger")
+    
 
 def preprocess(tweet, ascii=True, ignore_rt_char=True, ignore_url=True,
                ignore_mention=True, ignore_hashtag=True,
@@ -76,10 +82,11 @@ def preprocess(tweet, ascii=True, ignore_rt_char=True, ignore_url=True,
     elif token.isdigit():
       token = '<num>'
     # singular only ...
-    if pos in ['NOUN','ADJ']:
+    '''if pos in ['NOUN','ADJ']:
       token = singularize(token)
     elif pos in ['VERB']:
-      token = t.lemma_
+      token = t.lemma_'''
+    token = t.lemma_
     res += token,
 
   if min_tweet_len and len(res) < min_tweet_len:
@@ -100,7 +107,7 @@ def get_tfidf(tweet_list, top_n, max_features=5000, min_df=5):
   return top_feature_name, top_feautre_idf
 
 
-def evaluate_model(file_name, date, n_iter, n_eval=5):
+def evaluate_model(file_name, date, n_iter, scope, n_eval=5):
   #
   corpus = Corpus()
   corpus.add_files(file_name, encoding='utf8')
@@ -108,7 +115,7 @@ def evaluate_model(file_name, date, n_iter, n_eval=5):
   preproc = TMPreproc(corpus)
   dtm_bg = preproc.dtm
   #
-  var_params = [{'n_topics': k} for k in range(10, int(n_eval*10), n_eval)]
+  var_params = [{'n_topics': k} for k in range(5, int(n_eval*10), n_eval)]
   #
   const_params = {
     'n_iter': n_iter,
@@ -117,16 +124,34 @@ def evaluate_model(file_name, date, n_iter, n_eval=5):
   eval_results = evaluate_topic_models(dtm_bg,
                                      varying_parameters=var_params,
                                      constant_parameters=const_params,
-                                     metric=['loglikelihood', 'cao_juan_2009', 'arun_2010', 'coherence_mimno_2011']#,
+                                     metric=['loglikelihood', 'cao_juan_2009', 'arun_2010']#,
                                      #return_models=True
                                      )
   #
   eval_results_by_topics = results_by_parameter(eval_results, 'n_topics')
   #
-  name = "evaluate_model_{}_{}iter_{}eval.png".format(date, n_iter, n_eval)
-  plot_eval_results(eval_results_by_topics, figsize=(8, 6), title=name[:-4], metric_direction_font_size='x-small', title_fontsize='medium', axes_title_fontsize='small')
+  name = "evaluate_model_{}_{}iter_{}eval_{}.png".format(date, n_iter, n_eval, scope)
+  plot_eval_results(eval_results_by_topics, figsize=(8, 6), metric_direction_font_size='x-small', title_fontsize='small', axes_title_fontsize='x-small')
   plt.tight_layout()
-  plt.savefig(name)
+  plt.savefig('out/'+name)
   return
   
-  
+    
+def buildTWDScoreDict(topic_word_matrix, id2word):
+    twdsdict = defaultdict(float)
+    (topicnumber,wordnumber) = np.shape(topic_word_matrix)
+    for topicid in range(topicnumber):
+        for wordid in range(wordnumber):
+            word = id2word[wordid]
+            t_prime =[topic_word_matrix[z][wordid] for z in range(topicnumber) if z != topicid]
+            fenmu = max(t_prime)
+            twdsdict[(topicid,word)] = topic_word_matrix[topicid][wordid]/fenmu
+    print('a topic word dscore dictionary is built.')
+    return twdsdict
+    
+    
+def sentDiscriminativeScore(sentence, topicid, twdsdict):
+    sentence_score = 0
+    for word in sentence.split():
+        sentence_score += twdsdict[(topicid,word)]
+    return sentence_score/len(sentence)

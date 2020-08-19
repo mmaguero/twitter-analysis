@@ -3,13 +3,12 @@ scipy
 numpy
 sklearn
 nltk
-bokeh
+bokeh==2.0.0
 lda
 pandas
 dask
 tmtoolkit[recommended,lda,sklearn,gensim]
-stop_words
-stopwordsiso
 spacy
 spacy_spanish_lemmatizer
-pattern
+stop_words
+stopwordsiso

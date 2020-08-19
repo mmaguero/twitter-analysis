@@ -15,12 +15,15 @@ from sklearn.manifold import TSNE
 import bokeh.plotting as bp
 from bokeh.plotting import save
 from bokeh.models import HoverTool
-from utils import preprocess
+from utils import preprocess, evaluate_model, buildTWDScoreDict, sentDiscriminativeScore
 #
 import dask.dataframe as dd
 import glob
 import pandas as pd
 import datetime
+from collections import defaultdict
+import heapq
+import sys
 #
 
 if __name__ == '__main__':
@@ -47,11 +50,13 @@ if __name__ == '__main__':
                       help='threshold probability for topic assignment')
   parser.add_argument('--num_example', required=True, type=int, default=5000,
                       help='number of tweets to show on the plot')
-  #                   
+  #
   parser.add_argument('--start_date', required=True, type=str,
-                      help='start date of data split, format: yyyy-mm-dd')                    
+                      help='start date of data split, format: yyyy-mm-dd')
   parser.add_argument('--end_date', required=True, type=str,
-                      help='end date of data split') 
+                      help='end date of data split')
+  parser.add_argument('--scope', required=True, type=str, default='SPA',
+                      help='scope of data: SPA (Spain) or LAT (LatinAmerica)')
   args = parser.parse_args()
 
   # unpack
@@ -65,6 +70,7 @@ if __name__ == '__main__':
   #
   start_date = datetime.datetime.strptime(args.start_date, "%Y-%m-%d").date()
   end_date = datetime.datetime.strptime(args.end_date, "%Y-%m-%d").date()
+  scope = args.scope
 
 
   ##############################################################################
@@ -73,42 +79,48 @@ if __name__ == '__main__':
   num_scanned_tweet = 0
   num_qualified_tweet = 0
 
-  #raw_tweet_files = os.listdir(raw_tweet_dir)
+  # tweets
   all_files = glob.glob(raw_tweet_dir + "/ours_*.csv")
-  raw_tweet_files = dd.read_csv(all_files,usecols=['tweet_id','tweet','date'])
+  raw_tweet_files = dd.read_csv(all_files,usecols=['tweet_id','tweet','date','user_id'])
   raw_tweet_files = raw_tweet_files.compute()
-  
+
+  # tweets lang
   all_files = glob.glob(raw_tweet_dir + "/tweets_*.csv")
   raw_lang_files = dd.read_csv(all_files,usecols=['tweet_id','lang'])
   raw_lang_files = raw_lang_files.compute()
-  
+
+  # tweets users 
+  all_files = glob.glob(raw_tweet_dir + '/users_loc*.csv')
+  raw_user_file = dd.read_csv(all_files,usecols=['id_str'])
+  raw_user_file = raw_user_file.compute()
+  raw_user_file.rename({'id_str': 'user_id'}, axis=1, inplace=True)
+
   # split by date
   raw_tweet_files['date'] = pd.to_datetime(raw_tweet_files['date']).dt.date
   raw_tweet_files = raw_tweet_files.loc[(raw_tweet_files['date'] <= end_date) & (raw_tweet_files['date'] >= start_date)]
+
+  # merge by lang: es
+  raw_tweet_lang = raw_tweet_files.merge(raw_lang_files, on='tweet_id')
   
-  raw_tweet_merge = raw_tweet_files.merge(raw_lang_files, on='tweet_id')
+  # merge with SPA users
+  if scope == 'SPA':
+    raw_tweet_merge = raw_tweet_lang.merge(raw_user_file, on='user_id')
+  else:
+    raw_tweet_merge = raw_tweet_lang
+    
   raw_tweet_merge.info()
   raw_tweet_text = set(raw_tweet_merge.loc[raw_tweet_merge['lang'].str.contains("es")]['tweet'])
-
-  #raw_tweet_text = raw_tweet_text.reset_index(drop=True)
-  #raw_tweet_utext = raw_tweet_text.drop_duplicates()
-  #raw_tweet_utext = raw_tweet_utext.reset_index(drop=True)
-  #raw_tweet_utext = set(raw_tweet_text['tweet'].tolist())
-  print('len', len(raw_tweet_text))
+  print('uniques', len(raw_tweet_text))
 
   raw_tweet = []
   processed_tweet = []
   processed_tweet_set = set()  # for quicker'item in?' check
 
-  t0 = time.time()
-
-  '''for f in raw_tweet_files:
-    in_file = os.path.join(raw_tweet_dir, f)
-    if not in_file.endswith('.txt'):  # ignore non .txt file
-      continue'''
-  #for t in open(in_file):
+  t0 = time.time() # start
+  
   for row in raw_tweet_text:
       num_scanned_tweet += 1
+      row = row.replace('\n','').replace('\r','')
       p_t = preprocess(row, ascii=False)
       if p_t and p_t not in processed_tweet_set: # ignore duplicate tweets
         raw_tweet += row,
@@ -122,9 +134,6 @@ if __name__ == '__main__':
       if num_qualified_tweet == num_train_tweet:  # enough data for training
         break
 
-  '''if num_qualified_tweet == num_train_tweet:  # break outer loop
-      break'''
-
   del processed_tweet_set  # free memory
 
   t1 = time.time()
@@ -132,9 +141,27 @@ if __name__ == '__main__':
     num_scanned_tweet, num_train_tweet, (t1-t0)/60.))
 
   ##############################################################################
+  # plot evaluation of LDA
+
+  # processed tweets to file
+  file_name = 'lda_simple/processed_tweet{}_{}_{}.txt'.format(
+    len(processed_tweet), end_date, scope)
+  with open(file_name, 'w') as f:
+    for item in processed_tweet:
+        f.write("%s\n" % item)
+  f.close()
+
+  # evaluate the number of topics
+  evaluate_model(file_name, end_date, n_iter, scope)
+
+  t1_0 = time.time()
+  print('\n>>> evaluate {} file to find optimum number of topics; took {} mins\n'.format(
+    file_name, (t1_0-t1)/60.))
+
+  ##############################################################################
   # train LDA
 
-  # ignore terms that have a document frequency strictly lower than 1, 3, 5
+  # ignore terms that have a document frequency strictly lower than 5, 3, 1
   try:
       cvectorizer = CountVectorizer(min_df=5)
       cvz = cvectorizer.fit_transform(processed_tweet)
@@ -151,12 +178,12 @@ if __name__ == '__main__':
 
   t2 = time.time()
   print('\n>>> LDA training done; took {} mins\n'.format((t2-t1)/60.))
-  
+
   try:
-      np.save('lda_simple/lda_doc_topic_{}tweets_{}topics_{}.npy'.format(
-    X_topics.shape[0], X_topics.shape[1], end_date), X_topics)
-      np.save('lda_simple/lda_topic_word_{}tweets_{}topics_{}.npy'.format(
-    X_topics.shape[0], X_topics.shape[1], end_date), lda_model.topic_word_)
+      np.save('lda_simple/lda_doc_topic_{}tweets_{}topics_{}_{}.npy'.format(
+    X_topics.shape[0], X_topics.shape[1], end_date, scope), X_topics)
+      np.save('lda_simple/lda_topic_word_{}tweets_{}topics_{}_{}.npy'.format(
+    X_topics.shape[0], X_topics.shape[1], end_date, scope), lda_model.topic_word_)
       print('\n>>> doc_topic & topic word written to disk\n')
   except Exception as e:
       print('\n>>> doc_topic & topic word written to disk\n', e, '\n')
@@ -188,26 +215,70 @@ if __name__ == '__main__':
     colormap += ('#%02X%02X%02X' % (r(), r(), r())),
   colormap = np.array(colormap)
 
-  # show topics and their top words
-  topic_summaries = []
+  # show topics and their top words: only prob
   topic_keywords = []
   topic_word = lda_model.topic_word_  # get the topic words
   vocab = cvectorizer.get_feature_names()
   for i, topic_dist in enumerate(topic_word):
     topic_words = np.array(vocab)[np.argsort(topic_dist)][:-(n_top_words+1):-1]
-    topic_summaries.append(str(i) + ':' + ','.join(topic_words))
     topic_keywords.append(','.join(topic_words))
-  
+
+  '''
+    DS(w, z) = P(w|z) / [max z' != z P(w|z')]
+  '''
+  # show topics and their top words
+  topic_summaries = []
+  topic_array = [] 
+  #
+  topic_word_ds = buildTWDScoreDict(topic_word, vocab) # get the topic words with ds
+  for i in range(n_topics):
+    topic_words = defaultdict(topic_word_ds.default_factory,
+                             filter(lambda x: x[0][0]==i, topic_word_ds.items()))
+    topic_dict = heapq.nlargest(n_top_words, topic_words.items(),key=lambda x: x[1])
+    top = []
+    for x in dict(topic_dict).keys():
+        top.append(x[1])
+    topic_array.append(top)
+    topic_summaries.append(str(i) + ':' + ','.join(top))
+
   #
   sent_topics_df = pd.DataFrame()
   # Get main topic in each document
   for i, topics in enumerate(X_topics):
       # Get the Dominant topic, Perc Contribution and Keywords for each document
-      sent_topics_df = sent_topics_df.append(pd.Series([int(topics.argmax()), round(topics[topics.argmax()],4), topic_keywords[topics.argmax()]]), ignore_index=True)
+      sent_topics_df = sent_topics_df.append(pd.Series([int(topics.argmax()), round(topics[topics.argmax()],4),
+      topic_keywords[topics.argmax()], ]), ignore_index=True)
   sent_topics_df.columns = ['Dominant_Topic', 'Perc_Contribution', 'Topic_Keywords']
-  # Add original text to the end of the output
-  contents = pd.Series(_raw_tweet)
+  # Add processed text to the end of the output
+  contents = pd.Series(_processed_tweet)
   sent_topics_df = pd.concat([sent_topics_df, contents], axis=1)
+  #
+
+  #
+  # Topic - ds Keywords Dataframe
+  df_topic_keywords = pd.DataFrame(topic_array)
+  df_topic_keywords.columns = ['Term '+ str(i) for i in range(1, df_topic_keywords.shape[1] + 1)]
+  df_topic_keywords['Topic_keywords'] = df_topic_keywords.values.tolist()
+  df_topic_keywords['Topic_number'] = df_topic_keywords.index #+ 1
+  df_topic_keywords = df_topic_keywords[['Topic_keywords', 'Topic_number']]
+
+  # Remove None from lists
+  tmp = []
+  for i in df_topic_keywords['Topic_keywords']:
+    tmp.append([x for x in i if x is not None])
+
+  df_topic_keywords['Topic_keywords'] = tmp
+
+  # Merge key terms back to main frame
+  sent_topics_df = pd.merge(sent_topics_df, df_topic_keywords, left_on='Dominant_Topic', right_on='Topic_number')
+  del sent_topics_df['Topic_number']
+  sent_topics_df.columns = ['Dominant_Topic', 'Perc_Contribution', 'Topic_Keywords', 'Text', 'DS_Keywords']
+  
+  '''
+  DS(s, z) = SUM_{w ∈ s}  ( DS(w, z) ) / Length(s)
+  '''
+  for index, row in sent_topics_df.iterrows():
+      sent_topics_df.loc[index, 'DS_Document'] = sentDiscriminativeScore(row['Text'], int(row['Dominant_Topic']), topic_word_ds)
   #
 
   # use the coordinate of a random tweet as string topic string coordinate
@@ -222,8 +293,8 @@ if __name__ == '__main__':
 
   title = "t-SNE visualization of LDA model trained on {} tweets, {} topics, " \
           "thresholding at {} topic probability, {} iter ({} data points and " \
-          "top {} words: {})".format(num_qualified_tweet, n_topics, threshold,
-                                 n_iter, num_example, n_top_words, end_date)
+          "top {} words: {}, {})".format(num_qualified_tweet, n_topics, threshold,
+                                 n_iter, num_example, n_top_words, end_date, scope)
 
   plot_lda = bp.figure(plot_width=1400, plot_height=1100,
                        title=title,
@@ -234,7 +305,7 @@ if __name__ == '__main__':
   plot_lda.yaxis.axis_label_text_font_size = "8pt"
   plot_lda.xaxis.axis_label_text_font_size = "8pt"
 
-  # create the dictionary with all the information    
+  # create the dictionary with all the information
   plot_dict = {
         'x': tsne_lda[:, 0],#tsne_lda[:num_example, 0],
         'y': tsne_lda[:, 1],#tsne_lda[:num_example, 1],
@@ -246,11 +317,11 @@ if __name__ == '__main__':
   # create the dataframe from the dictionary
   plot_df = pd.DataFrame.from_dict(plot_dict)
 
-  # declare the source    
+  # declare the source
   source = bp.ColumnDataSource(data=plot_df)
 
   # build scatter function from the columns of the dataframe
-  plot_lda.scatter('x', 'y', color='colors', source=source)               
+  plot_lda.scatter('x', 'y', color='colors', source=source)
 
   # plot crucial words
   for i in range(X_topics.shape[1]):
@@ -260,32 +331,29 @@ if __name__ == '__main__':
       topic_coord[i, 1] = 0 if np.isnan(topic_coord[i, 1]) else topic_coord[i, 1]
       plot_lda.text(topic_coord[i, 0], topic_coord[i, 1], [topic_summaries[i]])
     except:
-      print("Error in plot_lda...",str(i)) 
-  #   
+      print("Error in plot_lda...",str(i))
+  #
   hover = plot_lda.select(dict(type=HoverTool))
   hover.tooltips = {"tweet": "@tweet - topic: @topic_key"}
 
-  name = 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}.html'.format(
-    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date)
-  save(plot_lda, name, title=name.replace(".html",""))
-  
+  name = 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}_{}.html'.format(
+    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date, scope)
+  save(plot_lda, 'out/'+name, title=name.replace(".html",""))
+
   #
   # Group top 10 sentences under each topic
   sent_topics_sorteddf = pd.DataFrame()
   sent_topics_outdf_grpd = sent_topics_df.groupby('Dominant_Topic')
   for i, grp in sent_topics_outdf_grpd:
-    print(grp)
-    sent_topics_sorteddf = pd.concat([sent_topics_sorteddf, 
-                                             grp.sort_values(['Perc_Contribution'], ascending=[0]).head(10)], 
+    sent_topics_sorteddf = pd.concat([sent_topics_sorteddf,
+                                             grp.sort_values(['DS_Document'], ascending=[0]).head(10)], # or Perc_Contribution
                                             axis=0)
-  # Reset Index    
+  # Reset Index
   sent_topics_sorteddf.reset_index(drop=True, inplace=True)
   # Format
-  sent_topics_sorteddf.columns = ['Topic_Num', "Topic_Perc_Contrib", "Keywords", "Text"]
-  # Show
-  sent_topics_sorteddf.sample(5)
+  sent_topics_sorteddf.columns = ['Topic_Num', "Topic_Perc_Contrib", "Keywords", "Text", "DS_Keywords", "DS_Document"]
   # save to disk
-  sent_topics_sorteddf.to_csv(name.replace(".html",".tsv"), sep='\t', encoding='utf-8', index=False)
+  sent_topics_sorteddf.to_csv('out/'+name.replace(".html",".tsv"), sep='\t', encoding='utf-8', index=False)
   #
 
   t4 = time.time()
