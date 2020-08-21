@@ -111,7 +111,7 @@ Extra params for `topic_tweets.py`: `<start_date>`, `<end_date>` for filter the 
 3 .csv files:
 1. tweets file, with columns: 'tweet_id','tweet','date','user_id'
 1. lang detected file, with columns: 'tweet_id','lang'
-1. user file fo particular location (Spain for us), with column: 'user_id'
+1. user file of particular location (Spain for us), with column: 'id_str' (then merge with 'user_id')
 
 
 ## References
