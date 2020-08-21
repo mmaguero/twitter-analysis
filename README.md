@@ -48,7 +48,7 @@ credentials from your twitter app.
 
 ## Real-time twitter trend discovery 
 
-(Not tested in this fork) Run 
+<span style="color:gold">(Not tested in this fork)</span> Run 
 
 `bokeh serve --show real-time-twitter-trend-discovery.py --args <tw>
 <top_n_words> <*save_history>`, 
@@ -62,7 +62,7 @@ credentials are properly stored in the credentials.json file.
 
 ## Topic modeling and t-SNE visualization: 20 Newsgroups
 
-(Not tested in this fork) To train a topic model and visualize the news in 2-D space, run
+<span style="color:gold">(Not tested in this fork)</span> To train a topic model and visualize the news in 2-D space, run
 
 `python topic_20news.py --n_topics <n_topics> --n_iter <n_iter>
 --top_n <top_n> --threshold <threshold>`,
@@ -76,7 +76,7 @@ probability for topic assignment (default 0.0).
 
 ## Scrape tweets and save them to disk
 
-(Not tested in this fork) To scrape tweets and save them to disk for later use, run
+<span style="color:gold">(Not tested in this fork)</span> To scrape tweets and save them to disk for later use, run
 
 `python scrape_tweets.py`. 
 
@@ -106,6 +106,12 @@ model (default 1500), `<top_n>` being the number of top keywords we display
 (default 5000). The same for `topic_profiles.py`.
 
 Extra params for `topic_tweets.py`: `<start_date>`, `<end_date>` for filter the data, and `<scope>`, for merge with a CSV file with 1.2M Spain users (default SPA).
+
+### Data input
+3 .csv files:
+1. tweets file, with columns: 'tweet_id','tweet','date','user_id'
+1. lang detected file, with columns: 'tweet_id','lang'
+1. user file fo particular location (Spain for us), with column: 'user_id'
 
 
 ## References
