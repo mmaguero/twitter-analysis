@@ -107,3 +107,11 @@ model (default 1500), `<top_n>` being the number of top keywords we display
 
 Extra params for `topic_tweets.py`: `<start_date>`, `<end_date>` for filter the data, and `<scope>`, for merge with a CSV file with 1.2M Spain users (default SPA).
 
+
+## References
+1. https://github.com/lda-project/lda
+1. https://www.machinelearningplus.com/nlp/topic-modeling-gensim-python/
+1. https://datascience.blog.wzb.eu/2017/11/09/topic-modeling-evaluation-in-python-with-tmtoolkit/
+1. https://github.com/WZBSocialScienceCenter/tmtoolkit
+1. https://github.com/starry9t/TopicLabel
+1. https://towardsdatascience.com/%EF%B8%8F-topic-modelling-going-beyond-token-outputs-5b48df212e06
