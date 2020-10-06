@@ -94,7 +94,8 @@ First make sure you accumulated some tweets (in this fork, we prefer https://git
 `python topic_tweets.py
 --raw_tweet_dir <raw_tweet_dir> --num_train_tweet <num_train_tweet>
 --n_topics <n_topics> --n_iter <n_iter> --top_n <top_n> --threshold <threshold>
---num_example <num_example> --start_date <start_date> --end_date <end_date> --scope <scope>`, 
+--num_example <num_example> --start_date <start_date> --end_date <end_date> 
+--scope <scope> --lang <lang> --eval_n_topics <eval_n_topics>`
 
 where `<raw_tweet_dir>` being a folder containing
 raw tweet files, `<num_train_tweet>` being the number of tweets we use for
@@ -105,16 +106,15 @@ model (default 1500), `<top_n>` being the number of top keywords we display
 (default 0.0), and `<num_example>` being number of tweets to show on the plot
 (default 5000). The same for `topic_profiles.py`.
 
-Extra params for `topic_tweets.py`: `<start_date>`, `<end_date>` for filter the data, and `<scope>`, for merge with a CSV file with 1.2M Spain users (default SPA).
-Also `<lang>`, for filter by language (es [es_gn and gn in **pre-alfa**]) and `<eval_n_topics>`, if you want to evaluate the optimal numbers of topics...
+Extra params for `topic_tweets.py`: `<start_date>`, `<end_date>` for filter the data, and `<scope>`, for merge with a CSV file with Spain users (default SPA).
+Also `<lang>`, for filter by language (es [stable], es_gn and gn [pre-alfa]) and `<eval_n_topics>`, if you want to evaluate the optimal numbers of topics...
 
 ### Data input
-3 .csv files:
+4 .csv files:
 1. tweets file, with columns: 'tweet_id','tweet','date','user_id'
 1. lang detected file, with columns: 'tweet_id','lang'
 1. user file of particular location (Spain for us), with column: 'id_str' (then merge with 'user_id') 
-1.1 and a extra file to check locations.
-
+1. and a extra file to check locations.
 
 ## References
 1. https://github.com/lda-project/lda
