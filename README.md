@@ -106,12 +106,14 @@ model (default 1500), `<top_n>` being the number of top keywords we display
 (default 5000). The same for `topic_profiles.py`.
 
 Extra params for `topic_tweets.py`: `<start_date>`, `<end_date>` for filter the data, and `<scope>`, for merge with a CSV file with 1.2M Spain users (default SPA).
+Also `<lang>`, for filter by language (es [es_gn and gn in **pre-alfa**]) and `<eval_n_topics>`, if you want to evaluate the optimal numbers of topics...
 
 ### Data input
 3 .csv files:
 1. tweets file, with columns: 'tweet_id','tweet','date','user_id'
 1. lang detected file, with columns: 'tweet_id','lang'
-1. user file of particular location (Spain for us), with column: 'id_str' (then merge with 'user_id')
+1. user file of particular location (Spain for us), with column: 'id_str' (then merge with 'user_id') 
+1.1 and a extra file to check locations.
 
 
 ## References
