@@ -15,7 +15,7 @@ from sklearn.manifold import TSNE
 import bokeh.plotting as bp
 from bokeh.plotting import save
 from bokeh.models import HoverTool
-from utils import preprocess, evaluate_model, buildTWDScoreDict, sentDiscriminativeScore
+from utils import preprocess, evaluate_model, buildTWDScoreDict, sentDiscriminativeScore, get_spain_places #, get_latam_countries_homonyms
 #
 import dask.dataframe as dd
 import glob
@@ -24,6 +24,7 @@ import datetime
 from collections import defaultdict
 import heapq
 import sys
+import re
 #
 
 if __name__ == '__main__':
@@ -56,7 +57,11 @@ if __name__ == '__main__':
   parser.add_argument('--end_date', required=True, type=str,
                       help='end date of data split')
   parser.add_argument('--scope', required=True, type=str, default='SPA',
-                      help='scope of data: SPA (Spain) or LAT (LatinAmerica)')
+                      help='scope of data: SPA (Spain) or LAT (Latinamerica)')
+  parser.add_argument('--lang', required=True, type=str, default='es',
+                      help='language of the data: es (Spanish) or gn (Guarani) or es_gn')
+  parser.add_argument('--eval_n_topics', required=True, type=bool, default=False,
+                      help='evaluate number of topics: True or False')
   args = parser.parse_args()
 
   # unpack
@@ -71,7 +76,9 @@ if __name__ == '__main__':
   start_date = datetime.datetime.strptime(args.start_date, "%Y-%m-%d").date()
   end_date = datetime.datetime.strptime(args.end_date, "%Y-%m-%d").date()
   scope = args.scope
-
+  lang = args.lang
+  eval_n_topics = args.eval_n_topics
+  
 
   ##############################################################################
   # get training tweets
@@ -91,25 +98,39 @@ if __name__ == '__main__':
 
   # tweets users 
   all_files = glob.glob(raw_tweet_dir + '/users_loc*.csv')
-  raw_user_file = dd.read_csv(all_files,usecols=['id_str'])
+  raw_user_file = dd.read_csv(all_files,usecols=['id_str','location'])
   raw_user_file = raw_user_file.compute()
   raw_user_file.rename({'id_str': 'user_id'}, axis=1, inplace=True)
 
   # split by date
   raw_tweet_files['date'] = pd.to_datetime(raw_tweet_files['date']).dt.date
   raw_tweet_files = raw_tweet_files.loc[(raw_tweet_files['date'] <= end_date) & (raw_tweet_files['date'] >= start_date)]
+  print("by date tweets",len(raw_tweet_files))
 
-  # merge by lang: es
+  # merge by lang
   raw_tweet_lang = raw_tweet_files.merge(raw_lang_files, on='tweet_id')
   
   # merge with SPA users
   if scope == 'SPA':
     raw_tweet_merge = raw_tweet_lang.merge(raw_user_file, on='user_id')
+    # exclude latam but check spain places > 50k
+    #locations2exclude = "|".join(get_latam_countries_homonyms(raw_tweet_dir+"/locations2exclude.txt")) # get lists of LATAM countries and/or cities homonyms
+    locations2check = "|".join(get_spain_places(raw_tweet_dir+"/places_spain.csv")) # get lists of spain places > 50k 
+    raw_tweet_merge = raw_tweet_merge[raw_tweet_merge.apply(lambda x: len([s for s in str(x['location']).split() if re.compile(locations2check).match(s.lower())]) > 0, axis=1)]
+    print("excluding locations tweets",len(raw_tweet_merge))
+    # check spain
+    print(set(raw_tweet_merge["location"].tolist()))
   else:
     raw_tweet_merge = raw_tweet_lang
     
   raw_tweet_merge.info()
-  raw_tweet_text = set(raw_tweet_merge.loc[raw_tweet_merge['lang'].str.contains("es")]['tweet'])
+  if '_' in lang:
+      lang_ = lang.split('_')
+      raw_tweet_text_ = raw_tweet_merge.loc[(raw_tweet_merge['lang']==lang_[1]) | (raw_tweet_merge['lang']==lang_[0]+"_"+lang_[1]) | (raw_tweet_merge['lang']==lang_[1]+"_"+lang_[0])] # l1, l1_l2, l2_l1
+      print(set(raw_tweet_text_["lang"].tolist()))
+      raw_tweet_text = set(raw_tweet_text_['tweet'])
+  else:
+      raw_tweet_text = set(raw_tweet_merge.loc[raw_tweet_merge['lang'].str.contains(lang)]['tweet'])
   print('uniques', len(raw_tweet_text))
 
   raw_tweet = []
@@ -121,7 +142,7 @@ if __name__ == '__main__':
   for row in raw_tweet_text:
       num_scanned_tweet += 1
       row = row.replace('\n','').replace('\r','')
-      p_t = preprocess(row, ascii=False)
+      p_t = preprocess(row, ascii=False, lang=lang)
       if p_t and p_t not in processed_tweet_set: # ignore duplicate tweets
         raw_tweet += row,
         processed_tweet += p_t,
@@ -144,19 +165,24 @@ if __name__ == '__main__':
   # plot evaluation of LDA
 
   # processed tweets to file
-  file_name = 'lda_simple/processed_tweet{}_{}_{}.txt'.format(
-    len(processed_tweet), end_date, scope)
+  file_name = 'lda_simple/processed_tweet{}_{}_{}_{}.txt'.format(
+    len(processed_tweet), end_date, scope, lang)
   with open(file_name, 'w') as f:
     for item in processed_tweet:
         f.write("%s\n" % item)
   f.close()
 
   # evaluate the number of topics
-  evaluate_model(file_name, end_date, n_iter, scope)
-
-  t1_0 = time.time()
-  print('\n>>> evaluate {} file to find optimum number of topics; took {} mins\n'.format(
-    file_name, (t1_0-t1)/60.))
+  if eval_n_topics:
+      t1_0 = time.time()
+      try:
+        evaluate_model(file_name, end_date, n_iter, scope, lang)
+        print('\n>>> evaluate {} file to find optimum number of topics; took {} mins\n'.format(
+        file_name, (t1_0-t1)/60.))
+      except Exception as e:
+        print('\n>>> ERROR - evaluate {} file to find optimum number of topics; took {} mins\n{}\n'.format(
+        file_name, (t1_0-t1)/60., e))
+      #
 
   ##############################################################################
   # train LDA
@@ -170,8 +196,12 @@ if __name__ == '__main__':
           cvectorizer = CountVectorizer(min_df=3)
           cvz = cvectorizer.fit_transform(processed_tweet)
       except:
-          cvectorizer = CountVectorizer(min_df=1)
-          cvz = cvectorizer.fit_transform(processed_tweet)
+          try:
+              cvectorizer = CountVectorizer(min_df=1)
+              cvz = cvectorizer.fit_transform(processed_tweet)
+          except:
+              print('Early exit, no vocab...')
+              sys.exit(0)
 
   lda_model = lda.LDA(n_topics=n_topics, n_iter=n_iter)
   X_topics = lda_model.fit_transform(cvz)
@@ -180,10 +210,10 @@ if __name__ == '__main__':
   print('\n>>> LDA training done; took {} mins\n'.format((t2-t1)/60.))
 
   try:
-      np.save('lda_simple/lda_doc_topic_{}tweets_{}topics_{}_{}.npy'.format(
-    X_topics.shape[0], X_topics.shape[1], end_date, scope), X_topics)
-      np.save('lda_simple/lda_topic_word_{}tweets_{}topics_{}_{}.npy'.format(
-    X_topics.shape[0], X_topics.shape[1], end_date, scope), lda_model.topic_word_)
+      np.save('lda_simple/lda_doc_topic_{}tweets_{}topics_{}_{}_{}.npy'.format(
+    X_topics.shape[0], X_topics.shape[1], end_date, scope, lang), X_topics)
+      np.save('lda_simple/lda_topic_word_{}tweets_{}topics_{}_{}_{}.npy'.format(
+    X_topics.shape[0], X_topics.shape[1], end_date, scope, lang), lda_model.topic_word_)
       print('\n>>> doc_topic & topic word written to disk\n')
   except Exception as e:
       print('\n>>> doc_topic & topic word written to disk\n', e, '\n')
@@ -252,6 +282,9 @@ if __name__ == '__main__':
   # Add processed text to the end of the output
   contents = pd.Series(_processed_tweet)
   sent_topics_df = pd.concat([sent_topics_df, contents], axis=1)
+  # Add raw text to the end of the output
+  contents = pd.Series(_raw_tweet)
+  sent_topics_df = pd.concat([sent_topics_df, contents], axis=1)
   #
 
   #
@@ -272,7 +305,7 @@ if __name__ == '__main__':
   # Merge key terms back to main frame
   sent_topics_df = pd.merge(sent_topics_df, df_topic_keywords, left_on='Dominant_Topic', right_on='Topic_number')
   del sent_topics_df['Topic_number']
-  sent_topics_df.columns = ['Dominant_Topic', 'Perc_Contribution', 'Topic_Keywords', 'Text', 'DS_Keywords']
+  sent_topics_df.columns = ['Dominant_Topic', 'Perc_Contribution', 'Topic_Keywords', 'Text', 'Raw', 'DS_Keywords']
   
   '''
   DS(s, z) = SUM_{w ∈ s}  ( DS(w, z) ) / Length(s)
@@ -293,8 +326,8 @@ if __name__ == '__main__':
 
   title = "t-SNE visualization of LDA model trained on {} tweets, {} topics, " \
           "thresholding at {} topic probability, {} iter ({} data points and " \
-          "top {} words: {}, {})".format(num_qualified_tweet, n_topics, threshold,
-                                 n_iter, num_example, n_top_words, end_date, scope)
+          "top {} words: {}, {}, {})".format(num_qualified_tweet, n_topics, threshold,
+                                 n_iter, num_example, n_top_words, end_date, scope, lang)
 
   plot_lda = bp.figure(plot_width=1400, plot_height=1100,
                        title=title,
@@ -336,8 +369,8 @@ if __name__ == '__main__':
   hover = plot_lda.select(dict(type=HoverTool))
   hover.tooltips = {"tweet": "@tweet - topic: @topic_key"}
 
-  name = 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}_{}.html'.format(
-    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date, scope)
+  name = 'tsne_lda_viz_{}_{}_{}_{}_{}_{}_{}_{}_{}.html'.format(
+    num_qualified_tweet, n_topics, threshold, n_iter, num_example, n_top_words, end_date, scope, lang)
   save(plot_lda, 'out/'+name, title=name.replace(".html",""))
 
   #
@@ -351,7 +384,7 @@ if __name__ == '__main__':
   # Reset Index
   sent_topics_sorteddf.reset_index(drop=True, inplace=True)
   # Format
-  sent_topics_sorteddf.columns = ['Topic_Num', "Topic_Perc_Contrib", "Keywords", "Text", "DS_Keywords", "DS_Document"]
+  sent_topics_sorteddf.columns = ['Topic_Num', "Topic_Perc_Contrib", "Keywords", "Text", "Raw", "DS_Keywords", "DS_Document"]
   # save to disk
   sent_topics_sorteddf.to_csv('out/'+name.replace(".html",".tsv"), sep='\t', encoding='utf-8', index=False)
   #

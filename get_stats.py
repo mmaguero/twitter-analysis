@@ -25,15 +25,15 @@ data['date'] = pd.to_datetime(data['date'])
 # only by date
 dataC = data.groupby([data.date.dt.year,data.date.dt.month]).count()
 # write stats
-with open("statistics-date.tsv",'w') as write_tsv:
+with open("out/statistics-date.tsv",'w') as write_tsv:
     write_tsv.write(dataC[['date']].to_csv(sep='\t', encoding='utf-8'))
 # ... and by lang
 dataC = data.groupby([data.date.dt.year,data.date.dt.month,data.lang]).count()
 # write stats
-with open("statistics-date-lang.tsv",'w') as write_tsv:
+with open("out/statistics-date-lang.tsv",'w') as write_tsv:
     write_tsv.write(dataC[['date']].to_csv(sep='\t', encoding='utf-8'))
 # ... and by lang gn
 dataC = data[(data['lang'].str.contains('gn',regex=True))].groupby([data.date.dt.year,data.date.dt.month,data.lang]).count()
 # write stats
-with open("statistics-date-gn.tsv",'w') as write_tsv:
+with open("out/statistics-date-gn.tsv",'w') as write_tsv:
     write_tsv.write(dataC[['date']].to_csv(sep='\t', encoding='utf-8'))
