@@ -38,7 +38,7 @@ and spacy custom lemmatizer files:
 python -m spacy_spanish_lemmatizer download wiki
 ```
 
-
+(for language detection go to this [repo](https://github.com/mmaguero/lang_detection))
 
 ## Credentials
 
