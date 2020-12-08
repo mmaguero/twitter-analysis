@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*- 
 """
   Train LDA model using https://pypi.python.org/pypi/lda,
   and visualize in 2-D space with t-SNE.
@@ -88,8 +90,9 @@ if __name__ == '__main__':
 
   # tweets
   all_files = glob.glob(raw_tweet_dir + "/ours_*.csv")
-  raw_tweet_files = dd.read_csv(all_files,usecols=['tweet_id','tweet','date','user_id'])
+  raw_tweet_files = dd.read_csv(all_files,usecols=['tweet_id','tweet','date','user_id'],dtype={'user_id': 'str'})
   raw_tweet_files = raw_tweet_files.compute()
+  print("by tweets",len(raw_tweet_files))
 
   # tweets lang
   all_files = glob.glob(raw_tweet_dir + "/tweets_*.csv")
@@ -98,7 +101,7 @@ if __name__ == '__main__':
 
   # tweets users 
   all_files = glob.glob(raw_tweet_dir + '/users_loc*.csv')
-  raw_user_file = dd.read_csv(all_files,usecols=['id_str','location'])
+  raw_user_file = dd.read_csv(all_files,usecols=['id_str','location'],dtype={'id_str': 'str'})
   raw_user_file = raw_user_file.compute()
   raw_user_file.rename({'id_str': 'user_id'}, axis=1, inplace=True)
 
@@ -117,7 +120,7 @@ if __name__ == '__main__':
     #locations2exclude = "|".join(get_latam_countries_homonyms(raw_tweet_dir+"/locations2exclude.txt")) # get lists of LATAM countries and/or cities homonyms
     locations2check = "|".join(get_spain_places(raw_tweet_dir+"/places_spain.csv")) # get lists of spain places > 50k 
     raw_tweet_merge = raw_tweet_merge[raw_tweet_merge.apply(lambda x: len([s for s in str(x['location']).split() if re.compile(locations2check).match(s.lower())]) > 0, axis=1)]
-    print("excluding locations tweets",len(raw_tweet_merge))
+    print("SPA excluding locations tweets",len(raw_tweet_merge))
     # check spain
     print(set(raw_tweet_merge["location"].tolist()))
   else:

@@ -21,7 +21,7 @@ from tmtoolkit.topicmod.visualize import plot_eval_results
 from tmtoolkit.preprocess import TMPreproc
 from tmtoolkit.corpus import Corpus
 from collections import defaultdict
-import l3 # ParaMorfo for gn
+#import l3 # uncomment ParaMorfo for gn
 import pandas as pd
 
 # load custom lemma
@@ -192,6 +192,7 @@ def get_spain_places(file_name):
     
     
 def get_stem(text, mixed=False):
+    return # comment for gn
     stem = []
     doc = nlp(text)
     for token in doc:
@@ -209,6 +210,7 @@ def get_stem(text, mixed=False):
     
 
 def get_tag(word):
+    return # comment for gn
     tag = 'u'
     if len(l3.anal('gn', word, raw=True)) > 0:
         try:

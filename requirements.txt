@@ -6,7 +6,7 @@ nltk
 bokeh==2.0.0
 lda
 pandas
-dask
+dask[dataframe]
 tmtoolkit[recommended,lda,sklearn,gensim]
 spacy
 spacy_spanish_lemmatizer
