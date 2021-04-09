@@ -116,6 +116,26 @@ Also `<lang>`, for filter by language (es [stable], es_gn and gn [pre-alfa]) and
 1. user file of particular location (Spain for us), with column: 'id_str' (then merge with 'user_id') 
 1. and a extra file to check locations.
 
+## How do I cite this work?
+
+Please, cite this paper [Discovering topics in Twitter about the COVID-19 outbreak in Spain](http://journal.sepln.org/sepln/ojs/ojs/index.php/pln/article/view/6333/3762):
+
+```
+@article{PLN6333,
+	author = {Marvin M. Agüero-Torales and David Vilares and Antonio G. López-Herrera},
+	title = {Discovering topics in Twitter about the COVID-19 outbreak in Spain},
+	journal = {Procesamiento del Lenguaje Natural},
+	volume = {66},
+	number = {0},
+	year = {2021},
+	keywords = {COVID-19, Twitter, social networks, topic modeling},
+	abstract = {In this work, we apply topic modeling to study what users have been discussing in Twitter during the beginning of the COVID-19 pandemic. More particularly, we explore the period of time that includes three diﬀerentiated phases of the COVID-19 crisis in Spain: the pre-crisis time, the outbreak, and the beginning of the lockdown. To do so, we ﬁrst collect a large corpus of Spanish tweets and clean them. Then, we cluster the tweets into topics using a Latent Dirichlet Allocation model, and deﬁne generative and discriminative routes to later extract the most relevant keywords and sentences for each topic. Finally, we provide an exhaustive qualitative analysis about how such topics correspond to the situation in Spain at diﬀerent stages of the crisis.},
+	issn = {1989-7553},
+	url = {http://journal.sepln.org/sepln/ojs/ojs/index.php/pln/article/view/6333},
+	pages = {177--190}
+}
+```
+
 ## References
 1. https://github.com/lda-project/lda
 1. https://www.machinelearningplus.com/nlp/topic-modeling-gensim-python/
