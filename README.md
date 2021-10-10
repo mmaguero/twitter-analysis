@@ -116,6 +116,9 @@ Also `<lang>`, for filter by language (es [stable], es_gn and gn [pre-alfa]) and
 1. user file of particular location (Spain for us), with column: 'id_str' (then merge with 'user_id') 
 1. and a extra file to check locations.
 
+## Corpus
+For reproducibility, tweet_ids and dates are available [here](https://doi.org/10.7910/DVN/6PPSAZ).
+
 ## How do I cite this work?
 
 Please, cite this paper [Discovering topics in Twitter about the COVID-19 outbreak in Spain](http://journal.sepln.org/sepln/ojs/ojs/index.php/pln/article/view/6333/3762):
